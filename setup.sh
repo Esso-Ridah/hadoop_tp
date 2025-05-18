@@ -128,28 +128,93 @@ test_connections() {
     # Test de la connexion à Spark
     print_message "Test de la connexion à Spark..."
     docker exec -it spark-master spark-sql -e "SHOW DATABASES;"
+    
+    # Vérification des datanodes HDFS
+    print_message "Vérification des datanodes HDFS..."
+    docker exec -it namenode hdfs dfsadmin -report | grep "Live datanodes"
+    
+    # Création du répertoire Airflow dans HDFS
+    print_message "Création du répertoire Airflow dans HDFS..."
+    docker exec -it namenode hdfs dfs -mkdir -p /user/airflow
+    
+    # Test d'écriture/lecture dans HDFS
+    print_message "Test d'écriture/lecture dans HDFS..."
+    docker exec -it namenode bash -c 'echo "Test HDFS write/read" > test.txt && hdfs dfs -put test.txt /user/airflow/test.txt && hdfs dfs -cat /user/airflow/test.txt && hdfs dfs -ls /user/airflow/'
 }
 
-# Test du DAG MovieLens
-test_movielens_dag() {
-    print_message "Test du DAG MovieLens..."
+# Test des DAGs MovieLens
+test_movielens_dags() {
+    print_message "Test des DAGs MovieLens..."
     
     # Attendre que Airflow soit complètement démarré
     sleep 30
     
-    # Copier le DAG MovieLens
-    print_message "Copie du DAG MovieLens..."
+    # Copier les DAGs MovieLens
+    print_message "Copie des DAGs MovieLens..."
     cp movielens_ingestion.py airflow/dags/
+    cp movie_recommendation.py airflow/dags/
     
-    # Attendre que le DAG soit détecté
-    print_message "Attente de la détection du DAG..."
+    # Attendre que les DAGs soient détectés
+    print_message "Attente de la détection des DAGs..."
     sleep 30
     
-    # Déclencher le DAG
-    print_message "Déclenchement du DAG MovieLens..."
+    # Déclencher le DAG d'ingestion
+    print_message "Déclenchement du DAG d'ingestion..."
     docker exec -it airflow-webserver airflow dags trigger movielens_ingestion
     
-    print_message "Le DAG MovieLens a été déclenché. Vérifiez l'interface Airflow pour suivre son exécution."
+    # Attendre que l'ingestion soit terminée
+    print_message "Attente de la fin de l'ingestion..."
+    sleep 60
+    
+    # Déclencher le DAG de recommandation
+    print_message "Déclenchement du DAG de recommandation..."
+    docker exec -it airflow-webserver airflow dags trigger movie_recommendation
+    
+    print_message "Les DAGs MovieLens ont été déclenchés. Vérifiez l'interface Airflow pour suivre leur exécution."
+}
+
+# Déploiement et test de la visualisation Flask
+setup_viewer() {
+    print_message "Déploiement de l'interface Flask de visualisation..."
+    
+    # Nettoyer les anciens conteneurs
+    docker stop movie-recommendation-viewer 2>/dev/null || true
+    docker rm movie-recommendation-viewer 2>/dev/null || true
+
+    # Construire l'image Docker
+    if ! docker build -t movie-recommendation-viewer -f Dockerfile.viewer .; then
+        print_error "Échec de la construction de l'image Docker"
+        exit 1
+    fi
+
+    # Démarrer le conteneur
+    if ! docker run -d \
+        --name movie-recommendation-viewer \
+        --network hadoop_tp_hadoop_network \
+        -p 5000:5000 \
+        movie-recommendation-viewer; then
+        print_error "Échec du démarrage du conteneur Flask viewer"
+        exit 1
+    fi
+
+    # Vérifier que le conteneur est en cours d'exécution
+    if ! docker ps | grep -q movie-recommendation-viewer; then
+        print_error "Le conteneur Flask viewer n'est pas en cours d'exécution"
+        docker logs movie-recommendation-viewer
+        exit 1
+    fi
+
+    # Test de connectivité réseau depuis le conteneur Flask
+    print_message "Test de connectivité réseau depuis le conteneur Flask (ping namenode)..."
+    if ! docker exec -it movie-recommendation-viewer ping -c 2 namenode; then
+        print_warning "Le conteneur Flask viewer ne peut pas joindre le namenode. Vérifiez la configuration réseau."
+    else
+        print_message "Connectivité réseau OK."
+    fi
+
+    print_message "L'application Flask de visualisation est accessible à l'adresse : http://localhost:5000"
+    print_message "Pour voir les logs : docker logs movie-recommendation-viewer"
+    print_message "Pour arrêter l'application : docker stop movie-recommendation-viewer"
 }
 
 # Fonction principale
@@ -160,16 +225,16 @@ main() {
     start_containers
     setup_airflow
     test_connections
-    test_movielens_dag
-    
+    test_movielens_dags
+    setup_viewer
     print_message "Installation terminée avec succès !"
     print_message "Interfaces web disponibles :"
     print_message "- HDFS NameNode : http://localhost:9870"
     print_message "- YARN ResourceManager : http://localhost:8088"
     print_message "- Spark Master : http://localhost:8080"
     print_message "- Airflow : http://localhost:8081 (utilisateur: admin, mot de passe: admin)"
-    print_message ""
-    print_message "Le DAG MovieLens a été déclenché. Vérifiez l'interface Airflow pour suivre son exécution."
+    print_message "- Visualisation recommandations : http://localhost:5000"
+    print_message "Les DAGs MovieLens ont été déclenchés. Vérifiez l'interface Airflow pour suivre leur exécution."
 }
 
 # Exécution du script

@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+<configuration>
+    <!-- Configuration du metastore -->
+    <property>
+        <name>javax.jdo.option.ConnectionURL</name>
+        <value>jdbc:postgresql://postgres/metastore</value>
+        <description>URL de connexion à la base de données PostgreSQL</description>
+    </property>
+
+    <property>
+        <name>javax.jdo.option.ConnectionDriverName</name>
+        <value>org.postgresql.Driver</value>
+        <description>Driver JDBC pour PostgreSQL</description>
+    </property>
+
+    <property>
+        <name>javax.jdo.option.ConnectionUserName</name>
+        <value>hive</value>
+        <description>Nom d'utilisateur PostgreSQL</description>
+    </property>
+
+    <property>
+        <name>javax.jdo.option.ConnectionPassword</name>
+        <value>hive</value>
+        <description>Mot de passe PostgreSQL</description>
+    </property>
+
+    <!-- Configuration du warehouse -->
+    <property>
+        <name>hive.metastore.warehouse.dir</name>
+        <value>/user/hive/warehouse</value>
+        <description>Répertoire par défaut pour les tables Hive</description>
+    </property>
+
+    <!-- Configuration du metastore -->
+    <property>
+        <name>hive.metastore.schema.verification</name>
+        <value>false</value>
+        <description>Désactive la vérification du schéma du metastore</description>
+    </property>
+
+    <property>
+        <name>hive.metastore.uris</name>
+        <value>thrift://hive:9083</value>
+    </property>
+
+    <!-- Configuration de l'exécution -->
+    <property>
+        <name>hive.execution.engine</name>
+        <value>mr</value>
+        <description>Utilise MapReduce comme moteur d'exécution</description>
+    </property>
+
+    <!-- Configuration du serveur Hive -->
+    <property>
+        <name>hive.server2.thrift.port</name>
+        <value>10000</value>
+        <description>Port pour HiveServer2</description>
+    </property>
+
+    <property>
+        <name>hive.server2.thrift.bind.host</name>
+        <value>0.0.0.0</value>
+        <description>Adresse d'écoute pour HiveServer2</description>
+    </property>
+
+    <!-- Configuration des logs -->
+    <property>
+        <name>hive.log.dir</name>
+        <value>/opt/hive/logs</value>
+        <description>Répertoire des logs Hive</description>
+    </property>
+
+    <!-- Configuration de la sécurité -->
+    <property>
+        <name>hive.metastore.authorization.storage.checks</name>
+        <value>false</value>
+        <description>Désactive les vérifications d'autorisation du metastore</description>
+    </property>
+
+    <property>
+        <name>hive.security.authorization.enabled</name>
+        <value>false</value>
+        <description>Désactive l'autorisation Hive</description>
+    </property>
+
+    <property>
+        <name>hive.metastore.autoCreateAll</name>
+        <value>true</value>
+    </property>
+
+    <property>
+        <name>hive.server2.enable.doAs</name>
+        <value>false</value>
+    </property>
+</configuration> 

@@ -1,0 +1,10 @@
+USE movielens;
+
+CREATE TABLE IF NOT EXISTS movies (
+    movieId INT,
+    title STRING,
+    genres STRING
+)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY '::'
+STORED AS TEXTFILE; 

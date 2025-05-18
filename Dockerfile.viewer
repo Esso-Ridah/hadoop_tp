@@ -1,0 +1,25 @@
+FROM python:3.9-slim
+
+WORKDIR /app
+
+# Install system dependencies including network tools
+RUN apt-get update && apt-get install -y \
+    default-jdk \
+    iputils-ping \
+    net-tools \
+    curl \
+    iproute2 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy application files
+COPY app.py .
+COPY templates/ templates/
+
+# Install Python dependencies
+RUN pip install flask pyspark
+
+# Expose port
+EXPOSE 5000
+
+# Run the application
+CMD ["python", "app.py"] 

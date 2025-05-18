@@ -216,14 +216,11 @@ def create_recommendation_api():
 - Airflow UI pour l'orchestration
 - Git pour le versioning
 
-## Planning
-
-- **Phase 1** : ✅ Complété
-- **Sprint 1** : Semaine 1-2
-- **Sprint 2** : Semaine 3-4
-- **Sprint 3** : Semaine 5-6
-- **Sprint 4** : Semaine 7-8
-- **Présentation finale** : Semaine 9
+### Organisation du Travail
+- Travail en groupe
+- Organisation libre des tâches
+- Collaboration via Git
+- Communication régulière avec l'équipe pédagogique
 
 ## Contact
 

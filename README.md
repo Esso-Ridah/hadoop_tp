@@ -103,24 +103,138 @@ Les DAGs doivent être placés dans le dossier `./airflow/dags/`. Un exemple de 
 └── README.md
 ```
 
-## Tests de connexion
+## Tests de connexion et vérifications
 
-Le script `setup.sh` effectue automatiquement les tests de connexion suivants :
+### 1. Tests de connexion HDFS
 
-1. Test de la connexion à Spark :
+Vérifier que HDFS est accessible et fonctionne correctement :
+
 ```bash
-docker exec -it spark-master spark-sql -e "SHOW DATABASES;"
-```
-
-2. Test de la connexion à HDFS :
-```bash
+# Lister le contenu de la racine HDFS
 docker exec -it namenode hdfs dfs -ls /
+
+# Vérifier l'état des datanodes
+docker exec -it namenode hdfs dfsadmin -report | grep "Live datanodes"
+
+# Vérifier l'espace disponible
+docker exec -it namenode hdfs dfsadmin -report | grep "DFS Used"
+
+# Vérifier les permissions du répertoire Airflow
+docker exec -it namenode hdfs dfs -ls /user/airflow
 ```
 
-3. Test de la connexion à YARN :
+### 2. Tests d'écriture/lecture HDFS
+
+Vérifier que les opérations d'écriture et de lecture fonctionnent :
+
 ```bash
-docker exec -it resourcemanager yarn node -list
+# Test d'écriture simple
+docker exec -it namenode bash -c 'echo "Test HDFS write/read" > test.txt && hdfs dfs -put test.txt /user/airflow/test.txt'
+
+# Vérifier que le fichier a été écrit
+docker exec -it namenode hdfs dfs -ls /user/airflow/test.txt
+
+# Lire le contenu du fichier
+docker exec -it namenode hdfs dfs -cat /user/airflow/test.txt
+
+# Test avec un fichier plus grand
+docker exec -it namenode bash -c 'dd if=/dev/zero of=large_file.txt bs=1M count=10 && hdfs dfs -put large_file.txt /user/airflow/large_file.txt'
+
+# Vérifier la réplication du fichier
+docker exec -it namenode hdfs dfs -ls /user/airflow/large_file.txt
 ```
+
+### 3. Tests de connexion YARN
+
+Vérifier que YARN est opérationnel :
+
+```bash
+# Lister les nœuds YARN
+docker exec -it resourcemanager yarn node -list
+
+# Vérifier les applications en cours
+docker exec -it resourcemanager yarn application -list
+
+# Vérifier la capacité du cluster
+docker exec -it resourcemanager yarn node -list | grep "Memory"
+```
+
+### 4. Tests de connexion Spark
+
+Vérifier que Spark est correctement configuré :
+
+```bash
+# Vérifier les bases de données disponibles
+docker exec -it spark-master spark-sql -e "SHOW DATABASES;"
+
+# Tester une requête simple
+docker exec -it spark-master spark-sql -e "SELECT 1 as test;"
+
+# Vérifier la connexion à HDFS depuis Spark
+docker exec -it spark-master spark-sql -e "CREATE TABLE test (id INT) LOCATION '/user/airflow/test_table';"
+```
+
+### 5. Tests de connexion Airflow
+
+Vérifier que Airflow est correctement configuré :
+
+```bash
+# Vérifier l'état des services Airflow
+docker exec -it airflow-webserver airflow db check
+
+# Lister les DAGs disponibles
+docker exec -it airflow-webserver airflow dags list
+
+# Vérifier les connexions configurées
+docker exec -it airflow-webserver airflow connections list
+```
+
+### 6. Tests de performance
+
+Vérifier les performances du cluster :
+
+```bash
+# Test de performance HDFS
+docker exec -it namenode bash -c 'time hdfs dfs -put /etc/hosts /user/airflow/test_perf.txt'
+
+# Test de performance Spark
+docker exec -it spark-master spark-sql -e "SELECT count(*) FROM range(1000000);"
+```
+
+### 7. Vérification des logs
+
+En cas de problème, vérifier les logs des différents services :
+
+```bash
+# Logs HDFS
+docker exec -it namenode cat $HADOOP_HOME/logs/hadoop-hadoop-namenode-namenode.log
+
+# Logs YARN
+docker exec -it resourcemanager cat $HADOOP_HOME/logs/yarn-hadoop-resourcemanager-resourcemanager.log
+
+# Logs Spark
+docker exec -it spark-master cat $SPARK_HOME/logs/spark.log
+
+# Logs Airflow
+docker exec -it airflow-webserver cat $AIRFLOW_HOME/logs/dag_id/task_id/execution_date/attempt_number.log
+```
+
+### 8. Vérification de la santé du cluster
+
+Vérifier l'état général du cluster :
+
+```bash
+# État des conteneurs
+docker-compose ps
+
+# Utilisation des ressources
+docker stats
+
+# Vérifier les erreurs dans les logs
+docker-compose logs | grep -i "error"
+```
+
+Ces tests peuvent être exécutés manuellement ou automatiquement via le script `setup.sh`. En cas d'échec d'un test, consultez la section Dépannage pour plus d'informations.
 
 ## Dépannage
 
@@ -239,46 +353,134 @@ docker exec -it spark-master spark-sql -e "SHOW DATABASES;"
 
 Ce projet est sous licence MIT.
 
-## DAG MovieLens
+## DAGs MovieLens
 
-Le projet inclut un DAG Airflow pour l'ingestion et la vérification des données MovieLens. Ce DAG effectue les opérations suivantes :
+Le projet inclut deux DAGs Airflow pour le traitement des données MovieLens :
 
+### 1. DAG d'Ingestion (movielens_ingestion)
+Ce DAG effectue les opérations suivantes :
 1. Téléchargement des données MovieLens (version 1M)
 2. Upload des données vers HDFS
 3. Vérification des données avec Spark SQL
 
+### 2. DAG de Recommandation (movie_recommendation)
+Ce DAG implémente un système de recommandation de films en utilisant Spark ML :
+1. Préparation des données (nettoyage et transformation)
+2. Entraînement du modèle ALS (Alternating Least Squares)
+3. Génération des recommandations pour tous les utilisateurs
+
 ### Résultats attendus
 
-Après l'exécution du DAG, vous devriez voir les statistiques suivantes dans les logs de la tâche `verify_data` :
+#### DAG d'Ingestion
+- Données MovieLens disponibles dans HDFS sous `/user/airflow/movielens/`
+- Tables Spark SQL créées et vérifiées
 
-1. **Movies** :
-   - 3,883 films au total
-   - Format : movieId, title, genres
-   - Exemple : "Toy Story (1995)" avec les genres "Animation|Children's|Comedy"
+#### DAG de Recommandation
+- Modèle ALS entraîné et sauvegardé dans HDFS
+- Recommandations générées pour chaque utilisateur
+- Métriques de performance (RMSE) calculées
 
-2. **Ratings** :
-   - 1,000,209 évaluations au total
-   - Format : userId, movieId, rating (1-5), timestamp
-   - Exemple : L'utilisateur 1 a donné une note de 5 au film 1193
+### Vérification de l'installation
 
-3. **Users** :
-   - 6,040 utilisateurs au total
-   - Format : userId, gender (M/F), age, occupation, zipcode
-   - Exemple : L'utilisateur 1 est une femme (F) de 1 an (catégorie d'âge), avec l'occupation 10, du code postal 48067
+Le script `setup.sh` effectue automatiquement les vérifications suivantes :
 
-### Exécution du DAG
-
-Le DAG est automatiquement copié et déclenché lors de l'exécution du script `setup.sh`. Vous pouvez également le déclencher manuellement via l'interface Airflow ou avec la commande :
-
+1. Test de la connexion à HDFS :
 ```bash
-docker exec -it airflow-webserver airflow dags trigger movielens_ingestion
+docker exec -it namenode hdfs dfs -ls /
 ```
 
-### Vérification des résultats
+2. Vérification des datanodes :
+```bash
+docker exec -it namenode hdfs dfsadmin -report | grep "Live datanodes"
+```
 
-Pour vérifier les résultats :
-1. Accédez à l'interface Airflow (http://localhost:8081)
-2. Connectez-vous avec les identifiants par défaut (admin/admin)
-3. Sélectionnez le DAG `movielens_ingestion`
-4. Cliquez sur la dernière exécution
-5. Vérifiez les logs de la tâche `verify_data` 
+3. Test d'écriture/lecture dans HDFS :
+```bash
+docker exec -it namenode bash -c 'echo "Test HDFS write/read" > test.txt && hdfs dfs -put test.txt /user/airflow/test.txt'
+```
+
+4. Test de la connexion à YARN :
+```bash
+docker exec -it resourcemanager yarn node -list
+```
+
+5. Test de la connexion à Spark :
+```bash
+docker exec -it spark-master spark-sql -e "SHOW DATABASES;"
+```
+
+### Dépannage
+
+Si vous rencontrez des problèmes :
+
+1. Vérifiez les logs des conteneurs :
+```bash
+docker-compose logs
+```
+
+2. Vérifiez l'état des datanodes :
+```bash
+docker exec -it namenode hdfs dfsadmin -report
+```
+
+3. Vérifiez les permissions HDFS :
+```bash
+docker exec -it namenode hdfs dfs -ls /user/airflow
+```
+
+4. Redémarrez les services :
+```bash
+docker-compose down
+docker-compose up -d
+```
+
+5. Réinitialisez l'environnement :
+```bash
+./setup.sh
+```
+
+## Notes importantes
+
+- Le script `setup.sh` supprime toutes les données existantes avant de réinitialiser l'environnement
+- Les données sont persistantes dans les dossiers `data/` et `airflow/`
+- Les mots de passe par défaut sont configurés pour le développement uniquement
+- Pour un environnement de production, modifiez les mots de passe et les clés de sécurité
+- Le DAG de recommandation utilise 10% des données pour les tests, modifiez le paramètre `sample(fraction=0.1)` pour utiliser l'ensemble des données 
+
+## Visualisation des recommandations (Flask)
+
+Une interface web Flask permet de visualiser les recommandations générées pour les utilisateurs MovieLens.
+
+### Lancer l'interface Flask
+
+L'interface Flask est automatiquement déployée par le script `setup.sh`. Elle est accessible à l'adresse :
+
+    http://localhost:5000
+
+Pour voir les logs :
+```bash
+docker logs movie-recommendation-viewer
+```
+Pour arrêter l'application :
+```bash
+docker stop movie-recommendation-viewer
+```
+
+### Tester la connectivité réseau depuis le conteneur Flask
+
+Pour diagnostiquer la connectivité réseau entre le conteneur Flask et le cluster Hadoop :
+```bash
+docker exec -it movie-recommendation-viewer ping -c 4 namenode
+```
+
+Vous pouvez aussi utiliser d'autres outils réseau comme `curl`, `netstat`, ou `ip addr` dans le conteneur :
+```bash
+docker exec -it movie-recommendation-viewer ip addr
+```
+
+### Utilisation de l'interface
+
+- Accédez à http://localhost:5000
+- Entrez un identifiant utilisateur pour voir ses recommandations.
+
+--- 
