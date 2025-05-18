@@ -1,0 +1,293 @@
+version: '3'
+
+services:
+  namenode:
+    build:
+      context: ./hadoop
+      dockerfile: Dockerfile
+    container_name: namenode
+    hostname: namenode
+    restart: always
+    ports:
+      - "9870:9870"  # Namenode Web UI
+      - "9000:9000"  # Namenode service
+    volumes:
+      - ./data/namenode:/hadoop/dfs/name
+    environment:
+      - CLUSTER_NAME=test
+    env_file:
+      - ./hadoop.env
+    networks:
+      - hadoop_network
+
+  datanode1:
+    build:
+      context: ./hadoop
+      dockerfile: Dockerfile
+    container_name: datanode1
+    hostname: datanode1
+    restart: always
+    depends_on:
+      - namenode
+    volumes:
+      - ./data/datanode1:/hadoop/dfs/data
+    networks:
+      - hadoop_network
+    environment:
+      SERVICE_PRECONDITION: "namenode:9000"
+    env_file:
+      - ./hadoop.env
+
+  datanode2:
+    build:
+      context: ./hadoop
+      dockerfile: Dockerfile
+    container_name: datanode2
+    hostname: datanode2
+    restart: always
+    depends_on:
+      - namenode
+    volumes:
+      - ./data/datanode2:/hadoop/dfs/data
+    networks:
+      - hadoop_network
+    environment:
+      SERVICE_PRECONDITION: "namenode:9000"
+    env_file:
+      - ./hadoop.env
+
+  datanode3:
+    build:
+      context: ./hadoop
+      dockerfile: Dockerfile
+    container_name: datanode3
+    hostname: datanode3
+    restart: always
+    depends_on:
+      - namenode
+    volumes:
+      - ./data/datanode3:/hadoop/dfs/data
+    networks:
+      - hadoop_network
+    environment:
+      SERVICE_PRECONDITION: "namenode:9000"
+    env_file:
+      - ./hadoop.env
+
+  resourcemanager:
+    build:
+      context: ./hadoop
+      dockerfile: Dockerfile
+    container_name: resourcemanager
+    hostname: resourcemanager
+    restart: always
+    depends_on:
+      - namenode
+    ports:
+      - "8088:8088"  # ResourceManager Web UI
+    networks:
+      - hadoop_network
+    environment:
+      SERVICE_PRECONDITION: "namenode:9000"
+    env_file:
+      - ./hadoop.env
+
+  nodemanager1:
+    build:
+      context: ./hadoop
+      dockerfile: Dockerfile
+    container_name: nodemanager1
+    hostname: nodemanager1
+    restart: always
+    depends_on:
+      - resourcemanager
+    networks:
+      - hadoop_network
+
+  nodemanager2:
+    build:
+      context: ./hadoop
+      dockerfile: Dockerfile
+    container_name: nodemanager2
+    hostname: nodemanager2
+    restart: always
+    depends_on:
+      - resourcemanager
+    networks:
+      - hadoop_network
+
+  nodemanager3:
+    build:
+      context: ./hadoop
+      dockerfile: Dockerfile
+    container_name: nodemanager3
+    hostname: nodemanager3
+    restart: always
+    depends_on:
+      - resourcemanager
+    networks:
+      - hadoop_network
+
+  spark-master:
+    image: bitnami/spark:3.5
+    container_name: spark-master
+    hostname: spark-master
+    restart: always
+    depends_on:
+      - namenode
+      - resourcemanager
+    ports:
+      - "8080:8080"  # Spark Master Web UI
+      - "7077:7077"  # Spark Master
+      - "6066:6066"  # Spark REST API
+    environment:
+      - SPARK_MODE=master
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_IPS=spark-master
+      - SPARK_PUBLIC_DNS=localhost
+      - SPARK_MASTER_OPTS="-Dspark.deploy.rest.enabled=true"
+    volumes:
+      - ./data/spark:/opt/bitnami/spark/data
+    networks:
+      - hadoop_network
+
+  spark-worker1:
+    image: bitnami/spark:3.5
+    container_name: spark-worker1
+    hostname: spark-worker1
+    restart: always
+    depends_on:
+      - spark-master
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_WORKER_MEMORY=1G
+      - SPARK_WORKER_CORES=1
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_IPS=spark-worker1
+      - SPARK_PUBLIC_DNS=localhost
+    volumes:
+      - ./data/spark:/opt/bitnami/spark/data
+    networks:
+      - hadoop_network
+
+  spark-worker2:
+    image: bitnami/spark:3.5
+    container_name: spark-worker2
+    hostname: spark-worker2
+    restart: always
+    depends_on:
+      - spark-master
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_WORKER_MEMORY=1G
+      - SPARK_WORKER_CORES=1
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_IPS=spark-worker2
+      - SPARK_PUBLIC_DNS=localhost
+    volumes:
+      - ./data/spark:/opt/bitnami/spark/data
+    networks:
+      - hadoop_network
+
+  postgres:
+    image: postgres:15
+    container_name: postgres
+    restart: always
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    networks:
+      - hadoop_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  airflow-webserver:
+    build:
+      context: ./airflow
+      dockerfile: Dockerfile
+    container_name: airflow-webserver
+    restart: always
+    depends_on:
+      - postgres
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+      - AIRFLOW__CORE__FERNET_KEY=46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho=
+      - AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=true
+      - AIRFLOW__CORE__LOAD_EXAMPLES=false
+      - AIRFLOW__API__AUTH_BACKENDS=airflow.api.auth.backend.basic_auth
+      - AIRFLOW__CORE__AIRFLOW_HOME=/opt/airflow
+      - AIRFLOW__CORE__PLUGINS_FOLDER=/opt/airflow/plugins
+      - AIRFLOW__CORE__DAGS_FOLDER=/opt/airflow/dags
+      - AIRFLOW__CORE__LOGS_FOLDER=/opt/airflow/logs
+      - _PIP_ADDITIONAL_REQUIREMENTS=apache-airflow-providers-apache-spark
+    user: "${AIRFLOW_UID:-50000}:0"
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - ./airflow/plugins:/opt/airflow/plugins
+      - ./airflow/scripts:/opt/airflow/scripts
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "8081:8080"
+    command: webserver
+    networks:
+      - hadoop_network
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  airflow-scheduler:
+    build:
+      context: ./airflow
+      dockerfile: Dockerfile
+    container_name: airflow-scheduler
+    restart: always
+    depends_on:
+      - postgres
+      - airflow-webserver
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+      - AIRFLOW__CORE__FERNET_KEY=46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho=
+      - AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=true
+      - AIRFLOW__CORE__LOAD_EXAMPLES=false
+      - AIRFLOW__API__AUTH_BACKENDS=airflow.api.auth.backend.basic_auth
+      - AIRFLOW__CORE__AIRFLOW_HOME=/opt/airflow
+      - AIRFLOW__CORE__PLUGINS_FOLDER=/opt/airflow/plugins
+      - AIRFLOW__CORE__DAGS_FOLDER=/opt/airflow/dags
+      - AIRFLOW__CORE__LOGS_FOLDER=/opt/airflow/logs
+      - _PIP_ADDITIONAL_REQUIREMENTS=apache-airflow-providers-apache-spark
+    user: "${AIRFLOW_UID:-50000}:0"
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - ./airflow/plugins:/opt/airflow/plugins
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: scheduler
+    networks:
+      - hadoop_network
+
+networks:
+  hadoop_network:
+    driver: bridge
+
+volumes:
+  postgres_data: 
