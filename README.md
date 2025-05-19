@@ -29,7 +29,7 @@ Ce projet met en place un environnement de développement Hadoop complet avec Sp
 
 1. Cloner le repository :
 ```bash
-git clone <repository-url>
+git clone https://github.com/Esso-Ridah/hadoop_tp.git
 cd hadoop_tp
 ```
 
