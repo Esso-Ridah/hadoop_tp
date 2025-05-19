@@ -8,8 +8,8 @@ Ce projet met en place un environnement de développement Hadoop complet avec Sp
   - 1 NameNode
   - 3 DataNodes
 - **Hadoop YARN** : Gestion des ressources
-  - 1 ResourceManager
-  - 3 NodeManagers
+   - 1 ResourceManager
+   - 3 NodeManagers
 - **Apache Spark** : Moteur de traitement de données
   - 1 Spark Master
   - 2 Spark Workers
@@ -483,4 +483,355 @@ docker exec -it movie-recommendation-viewer ip addr
 - Accédez à http://localhost:5000
 - Entrez un identifiant utilisateur pour voir ses recommandations.
 
---- 
+## Système de Recommandation de Films avec Hadoop et Spark
+
+Ce projet implémente un système de recommandation de films en utilisant Hadoop et Spark, avec une interface web pour visualiser les recommandations.
+
+## Architecture
+
+Le système est composé de plusieurs composants :
+
+1. **Hadoop** : Stockage distribué des données
+   - NameNode : Gestion des métadonnées HDFS
+   - DataNodes : Stockage des données
+   - ResourceManager : Gestion des ressources YARN
+   - NodeManagers : Exécution des tâches
+
+2. **Spark** : Traitement des données
+   - Spark Master : Coordination des tâches
+   - Spark Workers : Exécution des tâches Spark
+
+3. **Airflow** : Orchestration des workflows
+   - Webserver : Interface web
+   - Scheduler : Planification des tâches
+
+4. **PostgreSQL** : Base de données pour Airflow
+
+5. **API REST** : Interface pour accéder aux recommandations
+   - Endpoint `/recommendations/<user_id>` : Obtenir les recommandations pour un utilisateur
+   - Endpoint `/metrics` : Obtenir les métriques du système
+   - Endpoint `/health` : Vérifier l'état du service
+
+6. **Monitoring** : Surveillance du système
+   - Prometheus : Collecte des métriques
+   - Grafana : Visualisation des métriques
+
+## Prérequis
+
+- Docker
+- Docker Compose
+- Python 3.9+
+- Git
+
+## Installation
+
+1. Cloner le repository :
+```bash
+git clone <repository-url>
+cd <repository-name>
+```
+
+2. Exécuter le script de configuration :
+```bash
+./setup.sh
+```
+
+3. Démarrer les services :
+```bash
+docker-compose up -d
+```
+
+## Accès aux Services
+
+- **Interface Web** : http://localhost:8081
+- **API REST** : http://localhost:5000
+- **Prometheus** : http://localhost:9090
+- **Grafana** : http://localhost:3000 (admin/admin)
+
+## Utilisation
+
+### Interface Web
+
+1. Accédez à l'interface web à l'adresse http://localhost:8081
+2. Connectez-vous avec les identifiants par défaut (airflow/airflow)
+3. Activez le DAG "movie_recommendation"
+4. Déclenchez une exécution manuelle
+
+### API REST
+
+1. Obtenir les recommandations pour un utilisateur :
+```bash
+curl http://localhost:5000/recommendations/1
+```
+
+2. Vérifier les métriques du système :
+```bash
+curl http://localhost:5000/metrics
+```
+
+3. Vérifier l'état du service :
+```bash
+curl http://localhost:5000/health
+```
+
+### Monitoring
+
+1. Accédez à Grafana à l'adresse http://localhost:3000
+2. Connectez-vous avec les identifiants par défaut (admin/admin)
+3. Le dashboard "Recommandations" est automatiquement configuré avec :
+   - Taux de recommandations
+   - Temps de réponse moyen
+   - Taux d'erreur
+
+## Structure des Données
+
+Les données sont stockées dans HDFS sous le chemin `/user/airflow/movielens/` avec les sous-répertoires suivants :
+- `raw` : Données brutes
+- `processed` : Données traitées
+- `recommendations` : Recommandations générées
+- `stats` : Statistiques du système
+
+## Monitoring
+
+Le système est surveillé via Prometheus et Grafana :
+
+1. **Prometheus** collecte les métriques suivantes :
+   - Nombre total de recommandations
+   - Temps de réponse des requêtes
+   - Nombre d'erreurs
+   - Métriques Hadoop et Spark
+
+2. **Grafana** visualise ces métriques avec :
+   - Un dashboard "Recommandations" préconfiguré
+   - Des graphiques en temps réel
+   - Des alertes configurables
+
+## Développement
+
+### Structure du Projet
+
+```
+.
+├── airflow/
+│   ├── dags/
+│   │   ├── api/
+│   │   │   ├── Dockerfile
+│   │   │   ├── requirements.txt
+│   │   │   └── recommendation_api.py
+│   │   ├── monitoring/
+│   │   │   ├── prometheus.yml
+│   │   │   └── grafana_dashboard.json
+│   │   └── movie_recommendation_dag.py
+│   ├── Dockerfile
+│   └── requirements.txt
+├── hadoop/
+│   └── Dockerfile
+├── docker-compose.yml
+├── setup.sh
+└── README.md
+```
+
+### Ajout de Nouvelles Fonctionnalités
+
+1. **API** :
+   - Modifier `airflow/dags/api/recommendation_api.py`
+   - Ajouter les dépendances dans `requirements.txt`
+   - Reconstruire l'image : `docker-compose build recommendation-api`
+
+2. **Monitoring** :
+   - Modifier `airflow/dags/monitoring/prometheus.yml` pour ajouter des métriques
+   - Modifier `airflow/dags/monitoring/grafana_dashboard.json` pour ajouter des visualisations
+   - Recharger la configuration : `docker-compose restart prometheus grafana`
+
+## Dépannage
+
+1. **Problèmes de Connexion** :
+   - Vérifier que tous les services sont en cours d'exécution : `docker-compose ps`
+   - Vérifier les logs : `docker-compose logs <service-name>`
+
+2. **Problèmes de Performance** :
+   - Vérifier les métriques dans Grafana
+   - Ajuster les paramètres de mémoire dans `docker-compose.yml`
+
+3. **Problèmes de Données** :
+   - Vérifier les permissions HDFS : `hdfs dfs -ls /user/airflow/movielens`
+   - Vérifier les logs Airflow pour les erreurs de traitement
+
+## Contribution
+
+1. Fork le projet
+2. Créer une branche pour votre fonctionnalité
+3. Commiter vos changements
+4. Pousser vers la branche
+5. Créer une Pull Request
+
+## Licence
+
+Ce projet est sous licence MIT. Voir le fichier LICENSE pour plus de détails.
+
+# Projet de Recommandation de Films avec Hadoop
+
+## Vue d'ensemble
+
+Ce projet implémente un système de recommandation de films utilisant :
+- Hadoop HDFS pour le stockage
+- YARN pour la gestion des ressources
+- Apache Spark pour le traitement
+- Apache Airflow pour l'orchestration
+- Flask pour l'interface de visualisation
+
+## Prérequis
+
+- Docker
+- Docker Compose
+- Au moins 8GB de RAM
+- Au moins 20GB d'espace disque libre
+
+## Installation
+
+1. Cloner le repository :
+```bash
+git clone <repository-url>
+cd hadoop_tp
+```
+
+2. Rendre le script d'installation exécutable :
+```bash
+chmod +x setup.sh
+```
+
+3. Exécuter le script d'installation :
+```bash
+./setup.sh
+```
+
+## Installation de l'Interface de Visualisation
+
+1. Installer les dépendances Python :
+```bash
+pip install flask pandas numpy matplotlib seaborn
+```
+
+2. Construire l'image Docker pour l'interface :
+```bash
+docker build -t movie-recommendation-viewer -f Dockerfile.viewer .
+```
+
+3. Lancer le conteneur de l'interface :
+```bash
+docker run -d --name movie-viewer --network hadoop_tp_hadoop_network -p 5000:5000 movie-recommendation-viewer
+```
+
+## Interfaces Web
+
+### HDFS
+- URL : http://localhost:9870
+- Credentials : admin/admin
+
+### YARN
+- URL : http://localhost:8088
+- Credentials : admin/admin
+
+### Spark
+- URL : http://localhost:8080
+- Credentials : admin/admin
+
+### Airflow
+- URL : http://localhost:8080
+- Credentials : airflow/airflow
+
+### Interface de Visualisation
+- URL : http://localhost:5000
+- Fonctionnalités :
+  - Sélection d'un utilisateur via un menu déroulant
+  - Affichage des recommandations de films
+  - Visualisation des scores de recommandation
+  - Filtrage par genre
+
+## Utilisation
+
+### HDFS
+```bash
+# Lister les fichiers
+hdfs dfs -ls /user/airflow/movielens
+
+# Copier un fichier local vers HDFS
+hdfs dfs -put local_file.txt /user/airflow/movielens/
+```
+
+### Spark
+```bash
+# Lancer un job Spark
+spark-submit --master yarn your_script.py
+```
+
+### Airflow
+1. Accéder à l'interface web
+2. Activer le DAG `movie_recommendation`
+3. Déclencher manuellement ou attendre le planning
+
+### Interface de Visualisation
+1. Ouvrir http://localhost:5000 dans votre navigateur
+2. Sélectionner un utilisateur dans le menu déroulant
+3. Consulter les recommandations de films générées
+4. Utiliser les filtres pour affiner les résultats
+
+## Structure des Dossiers
+
+```
+.
+├── airflow/
+│   └── dags/          # DAGs Airflow
+├── examples/
+│   └── solutions/     # Solutions des sprints
+├── tests/            # Tests unitaires
+└── docs/             # Documentation
+```
+
+## Tests de Connexion
+
+### HDFS
+```bash
+hdfs dfs -ls /
+```
+
+### Spark
+```bash
+spark-submit --master yarn --deploy-mode client test_spark.py
+```
+
+### Airflow
+```bash
+airflow test movie_recommendation start_date 2024-01-01
+```
+
+## Dépannage
+
+### Interface de Visualisation
+Si l'interface n'est pas accessible :
+1. Vérifier que le conteneur est en cours d'exécution :
+```bash
+docker ps | grep movie-viewer
+```
+
+2. Vérifier les logs du conteneur :
+```bash
+docker logs movie-viewer
+```
+
+3. Redémarrer le conteneur si nécessaire :
+```bash
+docker restart movie-viewer
+```
+
+4. Vérifier la connectivité réseau :
+```bash
+docker network inspect hadoop_tp_hadoop_network
+```
+
+## Support
+
+Pour toute question ou problème :
+1. Consulter la documentation
+2. Vérifier les issues existantes
+3. Créer une nouvelle issue si nécessaire 

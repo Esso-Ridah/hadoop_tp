@@ -44,10 +44,10 @@ CineMatch est une startup française de VOD (Vidéo à la Demande) qui souhaite 
 - Ingestion des données MovieLens
 - Vérification de l'intégrité des données
 
-### Phase 2 : Développement du Système de Recommandation
+### Phase 2 : Développement du Système de Recommandation (Optionnelle)
 
-#### Sprint 1 : Recommandation Basique
-**État** : À venir
+#### Recommandation Basique
+**État** : Complétée et fournie
 
 ##### Base fournie
 - Structure du DAG Airflow
@@ -65,7 +65,7 @@ CineMatch est une startup française de VOD (Vidéo à la Demande) qui souhaite 
 - Documentation du code
 - Tests unitaires
 
-##### Exercice
+##### Exercice 1
 ```python
 def train_als_model(ratings_df):
     """
@@ -78,7 +78,7 @@ def train_als_model(ratings_df):
 ```
 
 #### Sprint 2 : Optimisation des Performances
-**État** : À venir
+**État** : Optionnel
 
 ##### Base fournie
 - Code du Sprint 1
@@ -108,7 +108,7 @@ def optimize_spark_job():
     pass
 ```
 
-#### Sprint 3 : Contraintes Business
+#### Sprint 3 : Contraintes Business (Obligatoire)
 **État** : À venir
 
 ##### Base fournie
@@ -139,7 +139,7 @@ def apply_business_rules(recommendations_df):
     pass
 ```
 
-#### Sprint 4 : API et Monitoring
+#### Sprint 4 : API et Monitoring (Optionnelle)
 **État** : À venir
 
 ##### Base fournie

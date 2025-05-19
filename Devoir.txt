@@ -1,0 +1,126 @@
+PROJET DE SYSTÈME DE RECOMMANDATION DE FILMS
+=========================================
+
+CONTEXTE GLOBAL
+--------------
+Ce projet implémente un système de recommandation de films utilisant les technologies Big Data. Il permet de :
+- Analyser les préférences des utilisateurs
+- Générer des recommandations personnalisées
+- Visualiser les résultats via une interface web
+
+ARCHITECTURE TECHNIQUE
+---------------------
+Le système utilise :
+- Hadoop HDFS pour le stockage des données
+- Apache Spark pour le traitement
+- Apache Airflow pour l'orchestration
+- Flask pour l'interface de visualisation
+
+PARTIES IMPORTANTES À LIRE
+-------------------------
+
+1. README.md
+   - Instructions d'installation
+   - Configuration de l'environnement
+   - Guide d'utilisation
+   - Dépannage courant
+   - Accès aux interfaces web
+
+2. PROJECT.md
+   - Objectifs du projet
+   - Architecture détaillée
+   - Composants techniques
+   - Workflow de traitement
+   - Métriques de performance
+
+3. EXERCICES (dans le dossier /exercises)
+
+   - Sprint 1 (OBLIGATOIRE ET FOURNIE): Implémentation de base
+     * Analyse des données
+     * Modèle ALS basique
+     * Évaluation simple
+   
+   - Sprint 2 (OPTIONNEL): Optimisation
+     * Validation croisée
+     * Optimisation des paramètres
+     * Analyse des performances
+   
+   - Sprint 3 (OBLIGATOIRE): Améliorations
+     * Gestion du cold start
+     * Diversité des recommandations
+     * Personnalisation avancée
+   
+   - Sprint 4 (OPTIONNEL): Monitoring et API
+     * Interface de monitoring
+     * API REST
+     * Métriques en temps réel
+
+   - Sprint 5 (OBLIGATOIRE): Pipeline Complet de Recommandation
+     * Fontions du Pipeline
+     * Définition du DAG
+     * Définition des dépendances
+     
+EXEMPLES DE SOLUTIONS POUR VOUS INSPIREZ
+--------------------
+Le dossier /examples/solutions contient des implémentations de référence pour chaque sprint :
+
+1. Sprint 1 (/examples/solutions/sprint1)
+   - analysis.py : Analyse des données MovieLens
+   - Visualisation des distributions
+   - Statistiques descriptives
+
+2. Sprint 2 (/examples/solutions/sprint2)
+   - optimization.py : Optimisation des paramètres
+   - Validation croisée
+   - Visualisation des résultats
+
+3. Sprint 3 (/examples/solutions/sprint3)
+   - improvements.py : Améliorations du système
+   - Gestion du cold start
+   - Diversité des recommandations
+
+4. Sprint 4 (/examples/solutions/sprint4)
+   - monitoring.py : API et monitoring
+   - Endpoints REST
+   - Métriques Prometheus
+
+INFORMATIONS CLÉS
+----------------
+1. Dans le README :
+   - Commandes d'installation
+   - URLs des interfaces
+   - Identifiants par défaut
+   - Procédures de test
+
+2. Dans PROJECT.md :
+   - Architecture système
+   - Workflows de traitement
+   - Points d'intégration
+   - Métriques de performance
+
+3. Dans les exercices :
+   - Objectifs par sprint
+   - Critères d'évaluation
+   - Livrables attendus
+   - Conseils d'implémentation
+
+4. Dans les exemples :
+   - Code commenté
+   - Bonnes pratiques
+   - Patterns d'implémentation
+   - Tests unitaires
+
+CONSEILS POUR COMMENCER
+----------------------
+1. Lire d'abord le README.md pour l'installation
+2. Consulter PROJECT.md pour comprendre l'architecture
+3. Étudier les exemples de solutions
+4. Commencer par le Sprint 1
+5. Utiliser les tests fournis
+
+RESSOURCES UTILES
+----------------
+- Documentation Spark : https://spark.apache.org/docs/
+- Documentation Airflow : https://airflow.apache.org/docs/
+- Documentation Flask : https://flask.palletsprojects.com/
+- Documentation MovieLens : https://grouplens.org/datasets/movielens/ 

@@ -31,10 +31,10 @@ dag = DAG(
 
 # Variables d'environnement pour Spark
 spark_env = {
-    'JAVA_HOME': '/usr/lib/jvm/java-8-openjdk-amd64',
-    'SPARK_HOME': '/opt/bitnami/spark',
-    'HADOOP_CONF_DIR': '/opt/bitnami/spark/conf',
-    'PYTHONPATH': '/opt/bitnami/spark/python:/opt/bitnami/spark/python/lib/py4j-0.10.9.7-src.zip',
+    'JAVA_HOME': '/usr/lib/jvm/java-17-openjdk-amd64',
+    'SPARK_HOME': '/opt/spark',
+    'HADOOP_CONF_DIR': '/opt/spark/conf',
+    'PYTHONPATH': '/opt/spark/python:/opt/spark/python/lib/py4j-0.10.9.7-src.zip',
 }
 
 def download_movielens_data():
@@ -135,7 +135,14 @@ def upload_to_hdfs(**context):
 def verify_data_task(**context):
     """Exécute les requêtes de vérification et retourne les résultats"""
     from pyspark.sql import SparkSession
-    
+    import os
+    os.environ.update({
+        'JAVA_HOME': '/usr/lib/jvm/java-17-openjdk-amd64',
+        'SPARK_HOME': '/opt/spark',
+        'HADOOP_CONF_DIR': '/opt/spark/conf',
+        'PYTHONPATH': '/opt/spark/python:/opt/spark/python/lib/py4j-0.10.9.7-src.zip',
+    })
+
     # Créer la session Spark
     spark = SparkSession.builder \
         .appName("Verify MovieLens Data") \

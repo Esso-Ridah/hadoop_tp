@@ -1,0 +1,27 @@
+lowercaseOutputName: true
+lowercaseOutputLabelNames: true
+rules:
+  - pattern: ".*"
+    name: "hadoop_$1"
+    type: GAUGE
+    labels:
+      instance: "$2"
+      component: "$3"
+  - pattern: ".*"
+    name: "hadoop_$1"
+    type: COUNTER
+    labels:
+      instance: "$2"
+      component: "$3"
+  - pattern: ".*"
+    name: "hadoop_$1"
+    type: HISTOGRAM
+    labels:
+      instance: "$2"
+      component: "$3"
+  - pattern: ".*"
+    name: "hadoop_$1"
+    type: SUMMARY
+    labels:
+      instance: "$2"
+      component: "$3" 

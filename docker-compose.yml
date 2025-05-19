@@ -11,6 +11,7 @@ services:
     ports:
       - "9870:9870"  # Namenode Web UI
       - "9000:9000"  # Namenode service
+      - "8020:8020"  # Namenode RPC
     volumes:
       - ./data/namenode:/hadoop/dfs/name
     environment:
@@ -146,9 +147,10 @@ services:
       - SPARK_RPC_ENCRYPTION_ENABLED=no
       - SPARK_LOCAL_IPS=spark-master
       - SPARK_PUBLIC_DNS=localhost
-      - SPARK_MASTER_OPTS="-Dspark.deploy.rest.enabled=true"
+      - SPARK_MASTER_OPTS="-Dspark.deploy.rest.enabled=true -Dspark.metrics.conf=/opt/bitnami/spark/conf/metrics.properties"
     volumes:
       - ./data/spark:/opt/bitnami/spark/data
+      - ./spark/conf/metrics.properties:/opt/bitnami/spark/conf/metrics.properties
     networks:
       - hadoop_network
 
@@ -282,6 +284,21 @@ services:
       - ./airflow/plugins:/opt/airflow/plugins
       - /var/run/docker.sock:/var/run/docker.sock
     command: scheduler
+    networks:
+      - hadoop_network
+
+  recommendation-api:
+    build:
+      context: ./airflow/dags/api
+      dockerfile: Dockerfile
+    container_name: recommendation-api
+    restart: always
+    ports:
+      - "5001:5000"
+      - "8000:8000"
+    depends_on:
+      - namenode
+      - spark-master
     networks:
       - hadoop_network
 

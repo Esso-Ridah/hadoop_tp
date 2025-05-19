@@ -4,7 +4,7 @@ from airflow.operators.python import PythonOperator
 from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
 import os
 import logging
-import re
+from als_optimization import optimize_als_parameters, evaluate_model_performance
 
 # Configuration du DAG
 default_args = {
@@ -25,16 +25,6 @@ dag = DAG(
     catchup=False,
 )
 
-def extract_release_year(title):
-    """
-    Extrait l'année de sortie d'un film à partir de son titre.
-    Format attendu : "Titre du film (YYYY)"
-    """
-    match = re.search(r'\((\d{4})\)', title)
-    if match:
-        return int(match.group(1))
-    return None
-
 def prepare_data(**context):
     """
     Prépare les données pour l'entraînement du modèle ALS
@@ -43,18 +33,12 @@ def prepare_data(**context):
     - Sauvegarde les données préparées
     """
     from pyspark.sql import SparkSession
-    from pyspark.sql.functions import col, when, udf
-    from pyspark.sql.types import IntegerType
+    from pyspark.sql.functions import col, when
     
     # Créer la session Spark
     spark = SparkSession.builder \
         .appName("Movie Recommendation - Data Preparation") \
         .config("spark.sql.warehouse.dir", "/tmp/spark-warehouse") \
-        .config("spark.hadoop.fs.defaultFS", "hdfs://namenode:9000") \
-        .config("spark.hadoop.dfs.client.use.datanode.hostname", "true") \
-        .config("spark.hadoop.dfs.datanode.use.datanode.hostname", "true") \
-        .config("spark.driver.extraJavaOptions", "-Djava.net.preferIPv4Stack=true") \
-        .config("spark.executor.extraJavaOptions", "-Djava.net.preferIPv4Stack=true") \
         .getOrCreate()
     
     try:
@@ -70,10 +54,6 @@ def prepare_data(**context):
             .option("header", "false") \
             .csv("hdfs://namenode:9000/user/airflow/movielens/movies.dat") \
             .toDF("movieId", "title", "genres")
-        
-        # Extraire l'année de sortie des films en utilisant une lambda function
-        extract_year_udf = udf(lambda title: int(re.search(r'\((\d{4})\)', title).group(1)) if re.search(r'\((\d{4})\)', title) else None, IntegerType())
-        movies_df = movies_df.withColumn("releaseYear", extract_year_udf(col("title")))
         
         # Nettoyer les données
         # - Supprimer les doublons
@@ -96,17 +76,10 @@ def prepare_data(**context):
             .mode('overwrite') \
             .parquet("hdfs://namenode:9000/user/airflow/movielens/ratings_clean.parquet")
         
-        # Sauvegarder les données des films avec l'année de sortie
-        movies_df.write \
-            .mode('overwrite') \
-            .parquet("hdfs://namenode:9000/user/airflow/movielens/movies_with_year.parquet")
-        
         # Afficher quelques statistiques
         logging.info(f"Nombre total de notes : {clean_ratings.count()}")
         logging.info(f"Nombre d'utilisateurs uniques : {clean_ratings.select('userId').distinct().count()}")
         logging.info(f"Nombre de films uniques : {clean_ratings.select('movieId').distinct().count()}")
-        logging.info(f"Année la plus ancienne : {movies_df.select('releaseYear').filter(col('releaseYear').isNotNull()).agg({'releaseYear': 'min'}).collect()[0][0]}")
-        logging.info(f"Année la plus récente : {movies_df.select('releaseYear').filter(col('releaseYear').isNotNull()).agg({'releaseYear': 'max'}).collect()[0][0]}")
         
     finally:
         spark.stop()
@@ -121,8 +94,6 @@ def train_als_model(**context):
     """
     from pyspark.sql import SparkSession
     from pyspark.ml.recommendation import ALS
-    from pyspark.ml.evaluation import RegressionEvaluator
-    from pyspark.ml.tuning import ParamGridBuilder, CrossValidator
     
     # Créer la session Spark avec des configurations optimisées
     spark = SparkSession.builder \
@@ -133,68 +104,46 @@ def train_als_model(**context):
         .config("spark.driver.maxResultSize", "1g") \
         .config("spark.sql.shuffle.partitions", "10") \
         .config("spark.default.parallelism", "10") \
-        .config("spark.hadoop.fs.defaultFS", "hdfs://namenode:9000") \
-        .config("spark.hadoop.dfs.client.use.datanode.hostname", "true") \
-        .config("spark.hadoop.dfs.datanode.use.datanode.hostname", "true") \
-        .config("spark.driver.extraJavaOptions", "-Djava.net.preferIPv4Stack=true") \
-        .config("spark.executor.extraJavaOptions", "-Djava.net.preferIPv4Stack=true") \
         .getOrCreate()
     
     try:
         # Charger les données préparées
         ratings_df = spark.read.parquet("hdfs://namenode:9000/user/airflow/movielens/ratings_clean.parquet")
         
-        # Diviser en ensembles d'entraînement et de test
-        train, test = ratings_df.randomSplit([0.8, 0.2], seed=42)
+        # Diviser en ensembles d'entraînement, validation et test
+        train, validation, test = ratings_df.randomSplit([0.6, 0.2, 0.2], seed=42)
         
-        # Créer le modèle ALS
+        # Optimiser les paramètres du modèle
+        best_params, best_scores = optimize_als_parameters(train, validation, spark)
+        
+        # Créer le modèle ALS avec les meilleurs paramètres
         als = ALS(
             userCol="userId",
             itemCol="movieId",
             ratingCol="rating",
             coldStartStrategy="drop",
-            nonnegative=True
-        )
-        
-        # Définir une grille de paramètres réduite pour les tests
-        param_grid = ParamGridBuilder() \
-            .addGrid(als.rank, [10, 50]) \
-            .addGrid(als.regParam, [0.01, 0.1]) \
-            .addGrid(als.maxIter, [10]) \
-            .build()
-        
-        # Configurer l'évaluateur
-        evaluator = RegressionEvaluator(
-            metricName="rmse",
-            labelCol="rating",
-            predictionCol="prediction"
-        )
-        
-        # Configurer la validation croisée avec 2 folds
-        cv = CrossValidator(
-            estimator=als,
-            estimatorParamMaps=param_grid,
-            evaluator=evaluator,
-            numFolds=2,
-            parallelism=2  # Limiter le parallélisme pour éviter les problèmes de mémoire
+            nonnegative=True,
+            **best_params['rmse']  # Utiliser les paramètres qui minimisent le RMSE
         )
         
         # Entraîner le modèle
-        cv_model = cv.fit(train)
+        model = als.fit(train)
         
-        # Évaluer sur l'ensemble de test
-        predictions = cv_model.transform(test)
-        rmse = evaluator.evaluate(predictions)
+        # Évaluer les performances
+        metrics = evaluate_model_performance(model, test, spark)
         
         # Afficher les résultats
-        logging.info(f"RMSE sur l'ensemble de test : {rmse}")
+        logging.info("Métriques d'évaluation :")
+        for metric_name, value in metrics.items():
+            logging.info(f"{metric_name}: {value}")
         
-        # Sauvegarder le meilleur modèle
-        best_model = cv_model.bestModel
-        best_model.save("hdfs://namenode:9000/user/airflow/movielens/als_model")
+        # Sauvegarder le modèle
+        model.save("hdfs://namenode:9000/user/airflow/movielens/als_model")
         
-        # Afficher les meilleurs paramètres
-        logging.info(f"Meilleurs paramètres : {best_model.extractParamMap()}")
+        # Sauvegarder les métriques
+        spark.createDataFrame([metrics]).write \
+            .mode('overwrite') \
+            .parquet("hdfs://namenode:9000/user/airflow/movielens/model_metrics.parquet")
         
     finally:
         spark.stop()
@@ -213,11 +162,6 @@ def generate_recommendations(**context):
     spark = SparkSession.builder \
         .appName("Movie Recommendation - Generate Recommendations") \
         .config("spark.sql.warehouse.dir", "/tmp/spark-warehouse") \
-        .config("spark.hadoop.fs.defaultFS", "hdfs://namenode:9000") \
-        .config("spark.hadoop.dfs.client.use.datanode.hostname", "true") \
-        .config("spark.hadoop.dfs.datanode.use.datanode.hostname", "true") \
-        .config("spark.driver.extraJavaOptions", "-Djava.net.preferIPv4Stack=true") \
-        .config("spark.executor.extraJavaOptions", "-Djava.net.preferIPv4Stack=true") \
         .getOrCreate()
     
     try:
@@ -239,7 +183,7 @@ def generate_recommendations(**context):
     finally:
         spark.stop()
 
-# Tâches du DAG
+# Définir les tâches du DAG
 prepare_data_task = PythonOperator(
     task_id='prepare_data',
     python_callable=prepare_data,
@@ -258,5 +202,5 @@ generate_recommendations_task = PythonOperator(
     dag=dag,
 )
 
-# Définition des dépendances
+# Définir les dépendances
 prepare_data_task >> train_model_task >> generate_recommendations_task 
